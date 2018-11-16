@@ -1,0 +1,12 @@
+{
+  "name": "kwbitcoin",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "repository": "https://github.com/konwoo/kwbitcoin.git",
+  "author": "konwoo <2konwoo@hanmail.net>",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "crypto-js": "^3.1.9-1"
+  }
+}
