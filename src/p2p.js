@@ -1,7 +1,17 @@
 const WebSockets = require("ws");
 const Blockchain = require("./blockchain");
+const MemPool = require("./mempool");
 
-const { getNewestBlock, isBlockStructorValid, addBlockToChain, replaceChain, getBlockChain } = Blockchain;
+const {
+        getNewestBlock,
+        isBlockStructorValid,
+        addBlockToChain,
+        replaceChain,
+        getBlockChain,
+        handleIncomingTx
+       } = Blockchain;
+
+const { getMempool } = MemPool;
 
 const sockets = [];
 
@@ -9,6 +19,8 @@ const sockets = [];
 const GET_LATEST = "GET_LATEST";
 const GET_ALL = "GET_ALL";
 const BLOCKCHAIN_RESPONSE = "BLOCKCHAIN_RESPONSE";
+const REQUEST_MEMPOOL = "REQUEST_MEMPOOL";
+const MEMPOOL_RESPONSE = "MEMPOOL_RESPONSE"
 
 // Message Creator
 const getLatest = () => {
@@ -32,6 +44,20 @@ const blockchainResponse = data => {
   };
 };
 
+const getAllMempool = () => {
+  return {
+    type: REQUEST_MEMPOOL,
+    data: null
+  };
+};
+
+const mempoolResponse = data => {
+  return {
+    type: MEMPOOL_RESPONSE,
+    data: data
+  };
+};
+
 const getSocket = () => sockets;
 
 const startP2pServer = server => {
@@ -39,14 +65,25 @@ const startP2pServer = server => {
   wsServer.on("connection", ws => {
     initSocketConnection(ws);
   });
+  wsServer.on("error", ws => {
+    console.log("error");
+  });
   console.log(`KWCoin P2P Server runniung`);
 };
 
 const initSocketConnection = ws => {
-  sockets.push();
-  handleSocketMessage(ws);
+  sockets.push(ws);
+  handleSocketMessages(ws);
   handleSocketError(ws);
   sendMessage(ws, getLatest());
+  setTimeout(() => {
+    sendMessageAll(ws, getAllMempool());
+  }, 1000);
+  setInterval(() => {
+    if (sockets.includes(ws)) {
+      sendMessage(ws, "");
+    }
+  }, 1000);
 };
 
 const parseData = data => {
@@ -58,38 +95,58 @@ const parseData = data => {
   }
 };
 
-const handleSocketMessage = ws => {
+const handleSocketMessages = ws => {
   ws.on("message", data => {
     const message = parseData(data);
     if(message === null){
+      console.log("WS MESSAGE IS NULL");
       return;
     }
-    console.log(message);
     switch(message.type) {
       case GET_LATEST:
+        console.log("GET_LATEST");
         sendMessage(ws, responseLatest());
         break;
       case GET_ALL:
+        console.log("GET_ALL");
         sendMessage(ws, responseAll());
         break;
       case BLOCKCHAIN_RESPONSE:
-        const receiveBlocks = message.data
-        if(receiveBlocks === null) {
+        console.log("BLOCKCHAIN_RESPONSE");
+        const receivedBlocks = message.data;
+        if(receivedBlocks === null) {
           break;
         }
-        handleBlockChainResponse(receiveBlocks);
+        handleBlockchainResponse(receivedBlocks);
+        break;
+      case REQUEST_MEMPOOL:
+        sendMessage(ws, returnMempool());
+        break;
+      case MEMPOOL_RESPONSE:
+        const receivedTxs = message.data;
+        if(receivedTxs === null) {
+          return ;
+        }
+        receivedTxs.forEach(tx => {
+          try {
+            handleIncomingTx(tx);
+            broadcastMempool();
+          } catch (e) {
+            console.log(e);
+          }
+        });
         break;
     }
   });
 };
 
-const handleBlockChainResponse = receiveBlocks => {
-  if(receiveBlocks.length === 0) {
-    console.log("receiveBlocks have a length of 0...");
+const handleBlockchainResponse = receivedBlocks => {
+  if (receivedBlocks.length === 0) {
+    console.log("Received blocks have a length of 0");
     return;
   }
 
-  const latestBlockReceived = receiveBlocks[receiveBlocks.length - 1];
+  const latestBlockReceived = receivedBlocks[receivedBlocks.length - 1];
   if(!isBlockStructorValid(latestBlockReceived)) {
     console.log("the block structure of the block received is not valid");
     return;
@@ -102,17 +159,21 @@ const handleBlockChainResponse = receiveBlocks => {
           console.log("HERE!!! HERE IS BROADCASTNEWBLOCK!");
           broadcastNewBlock();
         }
-      } else if (receiveBlocks.length === 1) {
+      } else if (receivedBlocks.length === 1) {
+        console.log("receivedBlocks have length 1");
         sendMessageAll(getAll());
       } else {
-        replaceChain(receiveBlocks);
+        console.log("This Function name is replaceChain");
+        replaceChain(receivedBlocks);
       }
   }
 };
 
+const returnMempool = () => mempoolResponse(getMempool());
+
 const sendMessage = (ws, message) => ws.send(JSON.stringify(message));
 
-const sendMessageAll = (message) =>
+const sendMessageAll = message =>
   sockets.forEach(ws => sendMessage(ws, message));
 
 const responseLatest = () => blockchainResponse([getNewestBlock()]);
@@ -120,6 +181,8 @@ const responseLatest = () => blockchainResponse([getNewestBlock()]);
 const responseAll = () => blockchainResponse(getBlockChain());
 
 const broadcastNewBlock = () => sendMessageAll(responseLatest());
+
+const broadcastMempool = () => sendMessageAll(returnMempool());
 
 const handleSocketError = ws => {
   const closeSocketConnection = ws => {
@@ -142,5 +205,6 @@ const connectToPeers = newPeer => {
 module.exports = {
   startP2pServer,
   connectToPeers,
-  broadcastNewBlock
+  broadcastNewBlock,
+  broadcastMempool
 };
