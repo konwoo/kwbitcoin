@@ -1,5 +1,6 @@
 const express = require('express'),
 bodyParser = require('body-parser'),
+cost = require("core"),
 morgan = require('morgan'),
 _ = require("lodash"),
 BlockChain = require("./blockchain"),
@@ -25,6 +26,7 @@ const PORT = process.env.HTTP_PORT || 3000;
 const app = express();
 
 app.use(bodyParser.json());
+app.use(cors());
 app.use(morgan("combined"));
 
 app
