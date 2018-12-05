@@ -1,28 +1,28 @@
-const WebSockets = require("ws");
-const Blockchain = require("./blockchain");
-const MemPool = require("./mempool");
+const WebSockets = require("ws"),
+  Mempool = require("./mempool"),
+  Blockchain = require("./blockchain");
 
 const {
-        getNewestBlock,
-        isBlockStructorValid,
-        addBlockToChain,
-        replaceChain,
-        getBlockChain,
-        handleIncomingTx
-       } = Blockchain;
+  getNewestBlock,
+  isBlockStructureValid,
+  replaceChain,
+  getBlockchain,
+  addBlockToChain,
+  handleIncomingTx
+} = Blockchain;
 
-const { getMempool } = MemPool;
+const { getMempool } = Mempool;
 
 const sockets = [];
 
-// Message Types
+// Messages Types
 const GET_LATEST = "GET_LATEST";
 const GET_ALL = "GET_ALL";
 const BLOCKCHAIN_RESPONSE = "BLOCKCHAIN_RESPONSE";
 const REQUEST_MEMPOOL = "REQUEST_MEMPOOL";
-const MEMPOOL_RESPONSE = "MEMPOOL_RESPONSE"
+const MEMPOOL_RESPONSE = "MEMPOOL_RESPONSE";
 
-// Message Creator
+// Message Creators
 const getLatest = () => {
   return {
     type: GET_LATEST,
@@ -40,10 +40,11 @@ const getAll = () => {
 const blockchainResponse = data => {
   return {
     type: BLOCKCHAIN_RESPONSE,
-    data: data
+    data
   };
 };
 
+// changed function name
 const getAllMempool = () => {
   return {
     type: REQUEST_MEMPOOL,
@@ -54,21 +55,21 @@ const getAllMempool = () => {
 const mempoolResponse = data => {
   return {
     type: MEMPOOL_RESPONSE,
-    data: data
+    data
   };
 };
 
-const getSocket = () => sockets;
+const getSockets = () => sockets;
 
-const startP2pServer = server => {
+const startP2PServer = server => {
   const wsServer = new WebSockets.Server({ server });
   wsServer.on("connection", ws => {
     initSocketConnection(ws);
   });
-  wsServer.on("error", ws => {
+  wsServer.on("error", () => {
     console.log("error");
   });
-  console.log(`KWCoin P2P Server runniung`);
+  console.log("KW P2P Server running");
 };
 
 const initSocketConnection = ws => {
@@ -77,7 +78,7 @@ const initSocketConnection = ws => {
   handleSocketError(ws);
   sendMessage(ws, getLatest());
   setTimeout(() => {
-    sendMessageAll(ws, getAllMempool());
+    sendMessageToAll(getAllMempool()); // changed line
   }, 1000);
   setInterval(() => {
     if (sockets.includes(ws)) {
@@ -98,23 +99,19 @@ const parseData = data => {
 const handleSocketMessages = ws => {
   ws.on("message", data => {
     const message = parseData(data);
-    if(message === null){
-      console.log("WS MESSAGE IS NULL");
+    if (message === null) {
       return;
     }
-    switch(message.type) {
+    switch (message.type) {
       case GET_LATEST:
-        console.log("GET_LATEST");
         sendMessage(ws, responseLatest());
         break;
       case GET_ALL:
-        console.log("GET_ALL");
         sendMessage(ws, responseAll());
         break;
       case BLOCKCHAIN_RESPONSE:
-        console.log("BLOCKCHAIN_RESPONSE");
         const receivedBlocks = message.data;
-        if(receivedBlocks === null) {
+        if (receivedBlocks === null) {
           break;
         }
         handleBlockchainResponse(receivedBlocks);
@@ -124,8 +121,8 @@ const handleSocketMessages = ws => {
         break;
       case MEMPOOL_RESPONSE:
         const receivedTxs = message.data;
-        if(receivedTxs === null) {
-          return ;
+        if (receivedTxs === null) {
+          return;
         }
         receivedTxs.forEach(tx => {
           try {
@@ -145,27 +142,22 @@ const handleBlockchainResponse = receivedBlocks => {
     console.log("Received blocks have a length of 0");
     return;
   }
-
   const latestBlockReceived = receivedBlocks[receivedBlocks.length - 1];
-  if(!isBlockStructorValid(latestBlockReceived)) {
-    console.log("the block structure of the block received is not valid");
+  if (!isBlockStructureValid(latestBlockReceived)) {
+    console.log("The block structure of the block received is not valid");
     return;
   }
-
-  const newstBlock = getNewestBlock();
-  if(latestBlockReceived.index > newstBlock.index) {
-      if(newstBlock.hash === latestBlockReceived.previousHash) {
-        if(addBlockToChain(latestBlockReceived)) {
-          console.log("HERE!!! HERE IS BROADCASTNEWBLOCK!");
-          broadcastNewBlock();
-        }
-      } else if (receivedBlocks.length === 1) {
-        console.log("receivedBlocks have length 1");
-        sendMessageAll(getAll());
-      } else {
-        console.log("This Function name is replaceChain");
-        replaceChain(receivedBlocks);
+  const newestBlock = getNewestBlock();
+  if (latestBlockReceived.index > newestBlock.index) {
+    if (newestBlock.hash === latestBlockReceived.previousHash) {
+      if (addBlockToChain(latestBlockReceived)) {
+        broadcastNewBlock();
       }
+    } else if (receivedBlocks.length === 1) {
+      sendMessageToAll(getAll());
+    } else {
+      replaceChain(receivedBlocks);
+    }
   }
 };
 
@@ -173,16 +165,16 @@ const returnMempool = () => mempoolResponse(getMempool());
 
 const sendMessage = (ws, message) => ws.send(JSON.stringify(message));
 
-const sendMessageAll = message =>
+const sendMessageToAll = message =>
   sockets.forEach(ws => sendMessage(ws, message));
 
 const responseLatest = () => blockchainResponse([getNewestBlock()]);
 
-const responseAll = () => blockchainResponse(getBlockChain());
+const responseAll = () => blockchainResponse(getBlockchain());
 
-const broadcastNewBlock = () => sendMessageAll(responseLatest());
+const broadcastNewBlock = () => sendMessageToAll(responseLatest());
 
-const broadcastMempool = () => sendMessageAll(returnMempool());
+const broadcastMempool = () => sendMessageToAll(returnMempool()); // <--- new line
 
 const handleSocketError = ws => {
   const closeSocketConnection = ws => {
@@ -198,13 +190,13 @@ const connectToPeers = newPeer => {
   ws.on("open", () => {
     initSocketConnection(ws);
   });
-  ws.on("error", () => console.log("connection failed"));
-  ws.on("close", () => console.log("connection failed"));
+  ws.on("error", () => console.log("Connection failed"));
+  ws.on("close", () => console.log("Connection failed"));
 };
 
 module.exports = {
-  startP2pServer,
+  startP2PServer,
   connectToPeers,
   broadcastNewBlock,
-  broadcastMempool
+  broadcastMempool // <--- new line
 };

@@ -1,30 +1,28 @@
-const express = require('express'),
-bodyParser = require('body-parser'),
-cost = require("core"),
-morgan = require('morgan'),
-_ = require("lodash"),
-BlockChain = require("./blockchain"),
-P2P = require("./p2p"),
-Mempool = require("./mempool"),
-Wallet = require("./wallet")
+const express = require("express"),
+  _ = require("lodash"),
+  cors = require("cors"),
+  bodyParser = require("body-parser"),
+  morgan = require("morgan"),
+  Blockchain = require("./blockchain"),
+  P2P = require("./p2p"),
+  Mempool = require("./mempool"),
+  Wallet = require("./wallet");
 
 const {
-      getBlockChain,
-      createNewBlock,
-      getAccountBalance,
-      sendTx,
-      getUTxOutList
-    } = BlockChain;
-
-const { startP2pServer, connectToPeers } = P2P;
+  getBlockchain,
+  createNewBlock,
+  getAccountBalance,
+  sendTx,
+  getUTxOutList
+} = Blockchain;
+const { startP2PServer, connectToPeers } = P2P;
 const { initWallet, getPublicFromWallet, getBalance } = Wallet;
 const { getMempool } = Mempool;
 
-// Do HTTP_PORT 4000, do not forget abouy typing 'export HTTP_PORT=4000' in your console..
+// Psssst. Don't forget about typing 'export HTTP_PORT=4000' in your console
 const PORT = process.env.HTTP_PORT || 3000;
 
 const app = express();
-
 app.use(bodyParser.json());
 app.use(cors());
 app.use(morgan("combined"));
@@ -32,7 +30,7 @@ app.use(morgan("combined"));
 app
   .route("/blocks")
   .get((req, res) => {
-    res.send(getBlockChain());
+    res.send(getBlockchain());
   })
   .post((req, res) => {
     const newBlock = createNewBlock();
@@ -56,8 +54,8 @@ app.get("/me/address", (req, res) => {
 
 app.get("/blocks/:hash", (req, res) => {
   const { params: { hash } } = req;
-  const block = _.find(getBlockChain(), { hash });
-  if(block === undefined) {
+  const block = _.find(getBlockchain(), { hash });
+  if (block === undefined) {
     res.status(400).send("Block not found");
   } else {
     res.send(block);
@@ -65,44 +63,44 @@ app.get("/blocks/:hash", (req, res) => {
 });
 
 app.get("/transactions/:id", (req, res) => {
-  const tx = _(getBlockChain()).map(blocks => blocks.data).flatten().find({ id : req.params.id });
-
-  if(tx === undefined) {
-    res.status(400).send("Transaction not found !");
+  const tx = _(getBlockchain())
+    .map(blocks => blocks.data)
+    .flatten()
+    .find({ id: req.params.id });
+  if (tx === undefined) {
+    res.status(400).send("Transaction not found");
   }
   res.send(tx);
-
 });
 
-app.route("/transactions")
+app
+  .route("/transactions")
   .get((req, res) => {
-    console.log("GET TRANSACTIONS");
     res.send(getMempool());
   })
   .post((req, res) => {
     try {
       const { body: { address, amount } } = req;
-      if(address === undefined || amount === undefined) {
+      if (address === undefined || amount === undefined) {
         throw Error("Please specify and address and an amount");
       } else {
         const resPonse = sendTx(address, amount);
         res.send(resPonse);
       }
     } catch (e) {
-      console.log(e);
       res.status(400).send(e.message);
-    } finally {
-
     }
   });
 
-  app.get("/address/:address", (req, res) => {
-    const { params: { address } } = req;
-    const balance = getBalance(address, getUTxOutList());
-    res.send({balance});
-  });
+app.get("/address/:address", (req, res) => {
+  const { params: { address } } = req;
+  const balance = getBalance(address, getUTxOutList());
+  res.send({ balance });
+});
 
-const server = app.listen(PORT, () => console.log(`KWCoin Server running on, ${PORT} 🤔`));
+const server = app.listen(PORT, () =>
+  console.log(`KWCoin Server running on, ${PORT} 🤔`)
+);
 
 initWallet();
-startP2pServer(server);
+startP2PServer(server);

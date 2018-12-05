@@ -1,14 +1,17 @@
 const _ = require("lodash"),
- Transaction = require("./transaction");
+  Transactions = require("./transactions");
 
-const { validateTx } = Transaction;
+const { validateTx } = Transactions;
 
 let mempool = [];
 
 const getMempool = () => _.cloneDeep(mempool);
 
 const getTxInsInPool = mempool => {
-  return _(mempool).map(tx => tx.txIns).flatten().value();
+  return _(mempool)
+    .map(tx => tx.txIns)
+    .flatten()
+    .value();
 };
 
 const isTxValidForPool = (tx, mempool) => {
@@ -23,8 +26,8 @@ const isTxValidForPool = (tx, mempool) => {
     });
   };
 
-  for(const txIn of tx.txIns){
-    if(isTxInAlreadyInPool(txInsInPool, txIn)){
+  for (const txIn of tx.txIns) {
+    if (isTxInAlreadyInPool(txInsInPool, txIn)) {
       return false;
     }
   }
@@ -32,41 +35,41 @@ const isTxValidForPool = (tx, mempool) => {
 };
 
 const hasTxIn = (txIn, uTxOutList) => {
-  const foundTxIn = uTxOutList.find(uTxO =>
-     uTxO.txOutId === txIn.txOutId && uTxO.txOutIndex === txIn.txOutIndex
-   );
+  const foundTxIn = uTxOutList.find(
+    uTxO => uTxO.txOutId === txIn.txOutId && uTxO.txOutIndex === txIn.txOutIndex
+  );
 
   return foundTxIn !== undefined;
 };
 
 const updateMempool = uTxOutList => {
-  const invalidTx = [];
+  const invalidTxs = [];
 
-  for(const tx of mempool) {
-    for(const txIn of tx.txIns) {
-        if(!hasTxIn(txIn, uTxOutList)) {
-          invalidTx.push(tx);
-          break;
-        }
+  for (const tx of mempool) {
+    for (const txIn of tx.txIns) {
+      if (!hasTxIn(txIn, uTxOutList)) {
+        invalidTxs.push(tx);
+        break;
+      }
     }
   }
 
-  if(invalidTx.length > 0) {
-    mempool = _.without(mempool, ...invalidTx);
+  if (invalidTxs.length > 0) {
+    mempool = _.without(mempool, ...invalidTxs);
   }
 };
 
-const addToMemPool = (tx, uTxOutList) => {
-  if(!validateTx(tx, uTxOutList)){
-    throw Error("This tx is invalid. Will not add it to pool.");
-  } else if(!isTxValidForPool(tx, mempool)) {
-    throw Error("this tx is not valid for the pool. Wll not add it.")
+const addToMempool = (tx, uTxOutList) => {
+  if (!validateTx(tx, uTxOutList)) {
+    throw Error("This tx is invalid. Will not add it to pool");
+  } else if (!isTxValidForPool(tx, mempool)) {
+    throw Error("This tx is not valid for the pool. Will not add it.");
   }
   mempool.push(tx);
 };
 
 module.exports = {
-  addToMemPool,
+  addToMempool,
   getMempool,
   updateMempool
 };
